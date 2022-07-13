@@ -9,7 +9,7 @@ anime_name=$(printf "%s" "$choice" | cut -d"|" -f2)
 
 # episodes_list=$(curl -s "https://zoro.to/ajax/v2/episode/list/$anime_id"|grep -Eo 'title=\\"(.+?)\\".+?href=\\"(.+?)\\"'|
 #   sed -En 's_.*title=\\"([^\"]*)\\".*href=\\"([^\"]*)\\"_\1|\2_p')
-episodes_list=$(curl -s "https://zoro.to/ajax/v2/episode/list/$anime_id"|grep -Eo 'href=\\"([^\\"]*)\\"'|sed -En 's_href=\\"(.*)\\"_\1_p')
+episodes_list=$(curl -s "https://zoro.to/ajax/v2/episode/list/$anime_id"|grep -Eo 'href=\\"([^\\"]*)\\"'|grep -v "javascript"|sed -En 's_href=\\"(.*)\\"_\1_p')
 # episode_names=$(printf "%s" "$episodes_list"|cut -d'|' -f1)
 episodes_links=$(printf "%s" "$episodes_list"|cut -d'|' -f2)
 
