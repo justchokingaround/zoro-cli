@@ -7,8 +7,9 @@ choice=$(printf "%s" "$anime_info"|fzf -d "\|" --with-nth 2..)
 anime_id=$(printf "%s" "$choice"|cut -d"|" -f1|grep -o "[0-9]*$")
 anime_name=$(printf "%s" "$choice" | cut -d"|" -f2)
 
-episodes_list=$(curl -s "https://zoro.to/ajax/v2/episode/list/$anime_id"|grep -Eo 'title=\\"(.+?)\\".+?href=\\"(.+?)\\"'|
-  sed -En 's_.*title=\\"([^\"]*)\\".*href=\\"([^\"]*)\\"_\1|\2_p')
+# episodes_list=$(curl -s "https://zoro.to/ajax/v2/episode/list/$anime_id"|grep -Eo 'title=\\"(.+?)\\".+?href=\\"(.+?)\\"'|
+#   sed -En 's_.*title=\\"([^\"]*)\\".*href=\\"([^\"]*)\\"_\1|\2_p')
+episodes_list=$(curl -s "https://zoro.to/ajax/v2/episode/list/$anime_id"|grep -Eo 'href=\\"([^\\"]*)\\"'|sed -En 's_href=\\"(.*)\\"_\1_p')
 # episode_names=$(printf "%s" "$episodes_list"|cut -d'|' -f1)
 episodes_links=$(printf "%s" "$episodes_list"|cut -d'|' -f2)
 
