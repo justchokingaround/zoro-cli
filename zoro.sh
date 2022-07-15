@@ -26,3 +26,4 @@ subs=$(printf "%s" "$json"|tr "{|}" "\n"|sed -En 's_"file":"([^"]*).*_\1_p'|grep
 
 [ -z "$video_link" ] && printf "No video link found\n" && exit 1
 [ -n "$subs" ] && mpv --sub-files="$subs" --force-media-title="$anime_name - Ep: $episode_number" "$video_link"
+mpv "$video_link" --force-media-title="$anime_name - Ep: $episode_number"
