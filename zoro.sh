@@ -1,16 +1,30 @@
 #!/bin/sh
 
-[ -z "$*" ] && printf "Search an anime: " && read -r query || query=$*
-query=$(printf "%s" "$query" | tr " " "+")
-choice=$(curl -s "https://zoro.to/search?keyword=$query" | sed -nE 's_.*href="(.*)\?ref=search" title="([^"]*)".*_\1|\2_p' | fzf -1 -d "\|" --with-nth 2..)
-anime_id=$(printf "%s" "$choice" | sed -nE "s_.*-([0-9]+)\|.*_\1_p")
-anime_name=$(printf "%s" "$choice" | cut -d"|" -f2)
+images_cache_dir="/tmp/zoro-images"
+image_config_path="$HOME/.config/rofi/styles/image-preview.rasi"
+test -d "$images_cache_dir" || mkdir "$images_cache_dir"
+query=$(printf "" | rofi -dmenu -l 0 -i -p "" -mesg "Search an anime: " | tr ' ' '+')
+[ -z "$query" ] && exit 1
+anime_list=$(curl -s "https://zoro.to/search?keyword=$query" | sed ':a;N;$!ba;s/\n//g;s/class="dynamic-name"/\n/g' |
+	sed -nE 's_.*img data-src="([^"]*)".*href="(.*)\?ref=search".*title="([^"]*)".*_\3\t\2\t\1_p')
+printf "%s\n" "$anime_list" | sed -nE "s@.*-([0-9]*)\t(.*)@\1\t\2@p" | while read -r media_id cover_url; do
+	curl -s -o "$images_cache_dir/$media_id.jpg" "$cover_url" &
+done
+wait && sleep 1
+IFS='	'
+choice=$(printf "%b\n" "$anime_list" | sed -nE "s@(.*)\t(.*)-([0-9]*)\t(.*)@\1\t\2\t\3\t\4@p" | while read -r anime_title _link media_id cover_url; do
+	printf "[%s]\t%s \x00icon\x1f%s/%s.jpg\n" "$media_id" "$anime_title" "$images_cache_dir" "$media_id"
+done | rofi -dmenu -i -p "" -theme "$image_config_path" -mesg "Select anime" -display-columns 2..)
+[ -z "$choice" ] && exit 1
+anime_id=$(printf "%s" "$choice" | sed -nE "s_\[([0-9]*)\].*_\1_p")
+anime_name=$(printf "%s" "$choice" | cut -f2)
 
 episodes_links=$(curl -s "https://zoro.to/ajax/v2/episode/list/$anime_id" | tr "<|>" "\n" | sed -nE 's_.*data-id=\\"([0-9]*)\\".*_\1_p')
 episodes_number=$(printf "%s\n" "$episodes_links" | wc -l | tr -d "[:space:]")
 
-[ "$episodes_number" -eq 0 ] && printf "No episodes found\n" && exit 1
-[ "$episodes_number" -gt 1 ] && printf "Choose an episode number between 1 and %s: " "$episodes_number" && read -r episode_number
+[ "$episodes_number" -eq 0 ] && notify-send "No episodes found\n"
+[ "$episodes_number" -eq 0 ] && exit 1
+[ "$episodes_number" -gt 1 ] && episode_number=$(rofi -dmenu -i -p "" -mesg "Choose and episode number between 1 and $episodes_number")
 [ -z "$episode_number" ] && episode_number="$episodes_number"
 
 episode_id=$(printf "%s\n" "$episodes_links" | sed -n "${episode_number}p")
@@ -25,11 +39,20 @@ embed_type=$(printf "%s" "$parse_embed" | cut -f2)
 
 key="$(curl -s "https://github.com/enimax-anime/key/blob/e${embed_type}/key.txt" | sed -nE "s_.*js-file-line\">(.*)<.*_\1_p")"
 json_data=$(curl -s "${provider_link}/ajax/embed-${embed_type}/getSources?id=${source_id}" -H "X-Requested-With: XMLHttpRequest")
-
-video_link=$(printf "%s" "$json_data" | tr "{|}" "\n" | sed -nE "s_.*\"sources\":\"([^\"]*)\".*_\1_p" | base64 -d |
-	openssl enc -aes-256-cbc -d -md md5 -k "$key" 2>/dev/null | sed -nE "s_.*\"file\":\"([^\"]*)\".*_\1_p")
+encrypted=$(printf "%s" "$json_data" | sed -nE "s_.*\"encrypted\":([^\,]*)\,.*_\1_p")
+case "$encrypted" in
+"true")
+	video_link=$(printf "%s" "$json_data" | tr "{|}" "\n" | sed -nE "s_.*\"sources\":\"([^\"]*)\".*_\1_p" | base64 -d |
+		openssl enc -aes-256-cbc -d -md md5 -k "$key" 2>/dev/null | sed -nE "s_.*\"file\":\"([^\"]*)\".*_\1_p" | head -1)
+	;;
+"false")
+	video_link=$(printf "%s" "$json_data" | tr "{|}" "\n" | sed -nE "s_.*\"file\":\"([^\"]*)\".*_\1_p" | head -1)
+	;;
+esac
 subs=$(printf "%s" "$json_data" | tr "{|}" "\n" | sed -nE "s_\"file\":\"(.*\.vtt)\".*_\1_p" | sed 's/:/\\:/g' | tr "\n" ":" | sed 's/:$//')
 
-[ -z "$video_link" ] && printf "No video link found\n" && exit 1
+notify-send -i "$images_cache_dir/$anime_id.jpg" "Playing $anime_name - Ep: $episode_number"
+[ -z "$video_link" ] && notify-send "No video link found\n"
+[ -z "$video_link" ] && exit 1
 [ -n "$subs" ] && mpv --sub-files="$subs" --force-media-title="$anime_name - Ep: $episode_number" "$video_link" && exit 0
 mpv "$video_link" --force-media-title="$anime_name - Ep: $episode_number"
