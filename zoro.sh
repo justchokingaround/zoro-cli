@@ -32,7 +32,7 @@ source_id=$(curl -s "https://zoro.to/ajax/v2/episode/servers?episodeId=$episode_
 embed_link=$(curl -s "https://zoro.to/ajax/v2/episode/sources?id=$source_id" | sed -nE "s_.*\"link\":\"([^\"]*)\".*_\1_p")
 
 # get the juicy links
-parse_embed=$(printf "%s" "$embed_link" | sed -nE "s_(.*)/embed-(4|6)/(.*)\?vast=1\$_\1\t\2\t\3_p")
+parse_embed=$(printf "%s" "$embed_link" | sed -nE "s_(.*)/embed-(4|6)/(.*)\?k=1\$_\1\t\2\t\3_p")
 provider_link=$(printf "%s" "$parse_embed" | cut -f1)
 source_id=$(printf "%s" "$parse_embed" | cut -f3)
 embed_type=$(printf "%s" "$parse_embed" | cut -f2)
